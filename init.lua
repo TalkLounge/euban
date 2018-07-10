@@ -371,13 +371,13 @@ local function form_ban(playername, fields)
 				 "tabheader[0,0;euban_tab;Ban,Unban,Records,Whitelist,Limit;1;false;false]" ..
 				 "dropdown[0,0.6;2.36,1;euban_ban_playerselect;".. table.concat(form[playername].euban_ban_playerselect, ",") ..";".. tostring(form[playername].euban_ban_playerselectindex) .."]" ..
 				 "field[0.3,1.95;1.6,1;euban_ban_playersearchfield;;".. minetest.formspec_escape(fields.euban_ban_playersearchfield or "") .."]" ..
-				 --"field_close_on_enter[euban_ban_playersearchfield;false]" ..
+				 "field_close_on_enter[euban_ban_playersearchfield;false]" ..
 				 "label[0.6,-0.1;Choose Player]" ..
 				 "button[1.4,2.06;1,0;euban_ban_playersearch;Search]" ..
 				 "label[0,1.36;Search player]" ..
 				 "label[0.7,2.5;Choose Time]" ..
 				 "field[0.3,3.2;1.2,1;euban_ban_timefield;;".. (fields.euban_ban_timefield or "") .."]" ..
-				 --"field_close_on_enter[euban_ban_timefield;false]" ..
+				 "field_close_on_enter[euban_ban_timefield;false]" ..
 				 "dropdown[1,2.95;1.3,1;euban_ban_timeselect;".. table.concat(form_ban_times, ",") ..";" .. tostring(form[playername].euban_ban_timeselectindex) .."]" ..
 				 "label[0.8,3.8;Reason]" ..
 				 "dropdown[0,4.45;2.36,1;euban_ban_reasonselect;".. ((table.concat(form_ban_reasons, ",") ..","):gsub(";(.-)[,]", ","):sub(1, -2)) ..";".. tostring(form[playername].euban_ban_reasonselectindex) .."]" ..
