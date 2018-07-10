@@ -768,7 +768,6 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 		form[playername].euban_wl_status = false
 	end
 	if fields.euban_wl_save then
-		minetest.chat_send_all(dump(form[playername].euban_wl_status))
 		if form[playername].euban_wl_status then
 			EUBan.Whitelist = true
 			for key, value in ipairs(form[playername].euban_wl_list) do
