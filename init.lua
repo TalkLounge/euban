@@ -689,7 +689,7 @@ local function form_records(playername, fields)
 	local Accounts = EUBan.accounts(Player)
 	local Reasons = ""
 	for index, main in ipairs(EUBan.Database[Player] and EUBan.Database[Player].reasons or {}) do
-		Reasons = Reasons .. ",User: ".. (main.user or "Server") .." | Time: ".. os.date("%m.%d.%y %H:%M", main.time) .." | Type: ".. (main.status and "Ban" or "Unban") .." | Reason:".. (main.message and ",".. seperate(main.message) or "")
+		Reasons = Reasons .. ",User: ".. (main.user or "Server") .." | Time: ".. os.date("%d.%m.%y %H:%M", main.time) .." | Type: ".. (main.status and "Ban" or "Unban") .." | Reason:".. (main.message and ",".. seperate(main.message) or "")
 	end
 	Reasons = Reasons:sub(2)
 	return "size[8,4.8]" ..
