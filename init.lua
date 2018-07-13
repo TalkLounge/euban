@@ -551,7 +551,7 @@ end
 
 minetest.register_on_player_receive_fields(function(player, formname, fields)
   local playername = player:get_player_name()
-	if formname ~= "euban:bany" or not minetest.get_player_privs(playername).ban or fields.quit then
+	if formname ~= "euban:bany" or not minetest.get_player_privs(playername).ban then
     return
   end
 	if fields.euban_bany_ban then
