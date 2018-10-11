@@ -162,7 +162,16 @@ local function import_xban()
 	save_file(EUBan.Path, EUBan.Database)
 end
 
-if #EUBan.Database == 0 then
+local is_empty = true
+
+for key, value in pairs(EUBan.Database) do
+	if key then
+		is_empty = false
+		break
+	end
+end
+
+if is_empty then
   import_xban()
 end
 
