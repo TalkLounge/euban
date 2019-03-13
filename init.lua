@@ -65,10 +65,17 @@ end
 
 --End of external source code
 
-local function save_file(Path, Database)
-	local file = io.open(Path, "w")
-  file:write("return {\n"..serialize(Database, 1).."\n}")
-  file:close()
+local function save_file(filepath, database)
+	local path, name, format = string.match(filepath, "(.-)([^\\/]-%.?([^%.\\/]*))$")
+	local tempfile = io.open(path .."~".. name, "w")
+  local success = tempfile:write("return {\n"..serialize(database, 1).."\n}")
+  tempfile:close()
+  if not success then
+		error("Write to file failed")
+		return
+  end
+  os.remove(filepath)
+  os.rename(path .."~".. name, filepath)
 end
 
 local save_file_step_next = {}
@@ -162,20 +169,11 @@ local function import_xban()
 	save_file(EUBan.Path, EUBan.Database)
 end
 
-local is_empty = true
-
-for key, value in pairs(EUBan.Database) do
-	if key then
-		is_empty = false
-		break
-	end
-end
-
-if is_empty then
+if not next(EUBan.Database) then
   import_xban()
 end
 
-local function convert_time(time)
+local function convert_time(time, left)
 	if not time then
 		return "Forever"
 	end
@@ -185,18 +183,18 @@ local function convert_time(time)
   local year = 365 * day
   if time > year then
     local years = math.floor((time / year) + 0.5)
-    return years .." year".. (years > 1 and "s" or "") .." left"
+    return years .." year".. (years > 1 and "s" or "") .. (left and " left" or "")
   elseif time > day then
     local days = math.floor((time / day) + 0.5)
-    return days .." day".. (days > 1 and "s" or "") .." left"
+    return days .." day".. (days > 1 and "s" or "") .. (left and " left" or "")
   elseif time > hour then
     local hours = math.floor((time / hour) + 0.5)
-    return hours .." hour".. (hours > 1 and "s" or "") .." left"
+    return hours .." hour".. (hours > 1 and "s" or "") .. (left and " left" or "")
   elseif time > minute then
     local minutes = math.floor((time / minute) + 0.5)
-    return minutes .." minute".. (minutes > 1 and "s" or "") .." left"
+    return minutes .." minute".. (minutes > 1 and "s" or "") .. (left and " left" or "")
   else
-    return time .." second".. (time > 1 and "s" or "") .." left"
+    return time .." second".. (time > 1 and "s" or "") .. (left and " left" or "")
   end
 end
 
@@ -215,7 +213,9 @@ function EUBan.status(Database)
 	end
 	local time = nil
 	if type(Database.time) == "number" then
-		if Database.time - os.time() <= 0 then
+		if Database.started == false then
+			time = Database.time - Database.reasons[#Database.reasons].time
+		elseif Database.time - os.time() <= 0 then
 			banned = false
 			account = false
 			time = nil
@@ -226,17 +226,21 @@ function EUBan.status(Database)
 	return banned, account, time --is banned, is only this account banned, time till unban
 end
 
-function EUBan.is_banned(playername, playerip)
+function EUBan.is_banned(playername, playerip, login)
 	if minetest.get_player_privs(playername).privs then
 		return
 	end
 	playerip = shortip(playerip)
 	local banned, account, time = EUBan.status(EUBan.Database[playername])
 	if banned then
-		if account then
-			return "Banned by name: ".. convert_time(time) .." Reason: ".. EUBan.Database[playername].reasons[#EUBan.Database[playername].reasons].message
+		if login and EUBan.Database[playername].started == false then
+			EUBan.Database[playername].time = EUBan.Database[playername].time - EUBan.Database[playername].reasons[#EUBan.Database[playername].reasons].time + os.time()
+			EUBan.Database[playername].started = nil
 		end
-		return "Banned by ip: ".. convert_time(time) .." Reason: ".. EUBan.Database[playername].reasons[#EUBan.Database[playername].reasons].message
+		if account then
+			return "Banned by account: ".. convert_time(time, true) .." Reason: ".. EUBan.Database[playername].reasons[#EUBan.Database[playername].reasons].message
+		end
+		return "Banned by ip: ".. convert_time(time, true) .." Reason: ".. EUBan.Database[playername].reasons[#EUBan.Database[playername].reasons].message
 	end
   for name, main in pairs(EUBan.Database) do
     banned, account, time = EUBan.status(main)
@@ -249,11 +253,19 @@ function EUBan.is_banned(playername, playerip)
 		if banned and not account and not exception then
 			for _, ip in ipairs(main.ips) do
         if ip == playerip then
-					return "Banned by ip: ".. convert_time(time) .." Reason: ".. main.reasons[#main.reasons].message
+					if login and EUBan.Database[playername].started == false then
+						EUBan.Database[playername].time = EUBan.Database[playername].time - EUBan.Database[playername].reasons[#EUBan.Database[playername].reasons].time + os.time()
+						EUBan.Database[playername].started = nil
+					end
+					return "Banned by ip: ".. convert_time(time, true) .." Reason: ".. main.reasons[#main.reasons].message
 				end
 				for _, playerip in ipairs(EUBan.Database[playername] and EUBan.Database[playername].ips or {}) do
 					if ip == playerip then
-						return "Banned by ip: ".. convert_time(time) .." Reason: ".. main.reasons[#main.reasons].message
+						if login and EUBan.Database[playername].started == false then
+							EUBan.Database[playername].time = EUBan.Database[playername].time - EUBan.Database[playername].reasons[#EUBan.Database[playername].reasons].time + os.time()
+							EUBan.Database[playername].started = nil
+						end
+						return "Banned by ip: ".. convert_time(time, true) .." Reason: ".. main.reasons[#main.reasons].message
 					end
 				end
 			end
@@ -311,7 +323,7 @@ minetest.register_on_prejoinplayer(function(name, ip)
 		if not name or not ip then
 			return "Please try again"
 		end
-    local banned = EUBan.is_banned(name, ip)
+    local banned = EUBan.is_banned(name, ip, true)
     if banned then
       return banned
     end
@@ -403,7 +415,7 @@ local function form_ban(playername, fields)
 				 "dropdown[0,4.45;2.36,1;euban_ban_reasonselect;".. ((table.concat(form_ban_reasons, ",") ..","):gsub(";(.-)[,]", ","):sub(1, -2)) ..";".. tostring(form[playername].euban_ban_reasonselectindex) .."]" ..
 				 "textarea[0.3,5.5;2.4,2;euban_ban_reasonfield;;".. minetest.formspec_escape(fields.euban_ban_reasonfield or "Same reason as last time") .."]" ..
 				 "label[0,4.1;Select predefined reason]" ..
-				 "label[0,5.2;Write own reason]" ..
+				 "label[0,5.2;Enter reason]" ..
 				 "button[0,7.2;1.3,1;euban_ban_banaccount;BAN:Account]" ..
 				 "button[1.1,7.2;1.3,1;euban_ban_banall;BAN:Ip]"
 end
@@ -417,18 +429,21 @@ minetest.register_chatcommand("euban", {
 end})
 
 local function form_bany(playername)
-	return "size[3.4,5.2]" ..
+	form[playername].euban_bany_login = form[playername].euban_bany_login == nil and false or form[playername].euban_bany_login
+	return "size[3.4,5.9]" ..
 				 "label[1.5,0;Details]" ..
 				 "label[0,0.5;Player:]" ..
 				 "label[1,0.5;".. form[playername].euban_bany_player .."]" ..
 				 "label[0,0.8;Time:]" ..
 				 "label[1,0.8;".. form[playername].euban_bany_time .."]" ..
-				 "label[0,1.1;Reason:]" ..
-				 "textarea[1.3,1.2;2.4,2;euban_bany_reason;;".. minetest.formspec_escape(form[playername].euban_bany_reason) .."]" ..
-				 "label[0,2.9;Accounts:\nDouble-click\nexceptions]" ..
-				 "textlist[1,3;2.2,1.3;euban_bany_account;".. table.concat(form[playername].euban_bany_account, ",") .."]" ..
-				 "button_exit[2.2,4.4;1.2,1;euban_bany_ban;BAN]" ..
-				 "button[1,4.4;1.2,1;euban_bany_back;Back]"
+				 "label[0,1.1;Start at\nnext login:]" ..
+				 "checkbox[1.0,1.27;euban_bany_login;;".. (form[playername].euban_bany_login and "true" or "false") .."]" ..
+				 "label[0,1.8;Reason:]" ..
+				 "textarea[1.3,1.9;2.4,2;euban_bany_reason;;".. minetest.formspec_escape(form[playername].euban_bany_reason) .."]" ..
+				 "label[0,3.6;Accounts:\nDouble-click\nexceptions]" ..
+				 "textlist[1,3.7;2.2,1.3;euban_bany_account;".. table.concat(form[playername].euban_bany_account, ",") .."]" ..
+				 "button_exit[2.2,5.1;1.2,1;euban_bany_ban;BAN]" ..
+				 "button[1,5.1;1.2,1;euban_bany_back;Back]"
 end
 
 function EUBan.accounts(playername, playerip)
@@ -475,9 +490,13 @@ end
 
 minetest.register_on_player_receive_fields(function(player, formname, fields)
   local playername = player:get_player_name()
-	if formname ~= "euban:ban" or not minetest.get_player_privs(playername).ban or fields.quit then
+	if formname ~= "euban:ban" or not minetest.get_player_privs(playername).ban then
     return
   end
+	if fields.quit then
+		form[playername] = nil
+		return
+	end
 	if fields.euban_ban_banaccount or fields.euban_ban_banall then
 		if fields.euban_ban_playerselect == "" then
 			minetest.chat_send_player(playername, "[Server]: Please select a player")
@@ -526,7 +545,7 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 	minetest.show_formspec(playername, "euban:ban", form_ban(playername, fields))
 end)
 
-function EUBan.ban(user, playername, account, time, reason, exceptions)
+function EUBan.ban(user, playername, account, time, reason, exceptions, login)
 	if exceptions then
 		for _, name in ipairs(exceptions) do
 			if not EUBan.Database[name].exceptions then
@@ -542,6 +561,9 @@ function EUBan.ban(user, playername, account, time, reason, exceptions)
 	end
 	if type(time) == "number" then
 		EUBan.Database[playername].time = time
+	end
+	if login then
+		EUBan.Database[playername].started = false
 	end
 	if not EUBan.Database[playername].reasons then
 		EUBan.Database[playername].reasons = {}
@@ -560,15 +582,18 @@ function EUBan.ban(user, playername, account, time, reason, exceptions)
 		local name = player:get_player_name()
 		local banned = EUBan.is_banned(name, minetest.get_player_ip(name))
 		if banned then
+			EUBan.Database[playername].started = nil
 			minetest.kick_player(name, banned)
 		end
 	end
-	if time and time < save_file_step_next[EUBan.Path] then
+	--[[if time and time < save_file_step_next[EUBan.Path] and EUBan.Database[playername].started == nil then
 		minetest.after(time - os.time(), function()
 				EUBan.Database[playername].time = nil
 				EUBan.Database[playername].banned = nil
 		end)
-	end
+	end]]
+	time = convert_time(time - os.time())
+	minetest.chat_send_all("[Server]: ".. (account and "Account" or "IP") .." of ".. playername .." was banned ".. (time == "Forever" and time or "for ".. time) .. (login and " starting at the next login" or "") .." by ".. user ..". Reason: ".. reason)
 end
 
 local function convert_time2(number, unit)
@@ -591,7 +616,12 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
     return
   end
 	if fields.euban_bany_ban then
-		EUBan.ban(playername, form[playername].euban_bany_player, form[playername].euban_bany_disaccount and true, form[playername].euban_bany_time ~= "Forever" and convert_time2(tonumber(form[playername].euban_bany_time:match("%d+")), form[playername].euban_bany_time:match("%D+")) + os.time() or nil, form[playername].euban_ban_reasonfield, form[playername].euban_bany_disaccount)
+		EUBan.ban(playername, form[playername].euban_bany_player, form[playername].euban_bany_disaccount == nil, form[playername].euban_bany_time ~= "Forever" and convert_time2(tonumber(form[playername].euban_bany_time:match("%d+")), form[playername].euban_bany_time:match("%D+")) + os.time() or nil, form[playername].euban_ban_reasonfield, form[playername].euban_bany_disaccount, form[playername].euban_bany_login)
+		form[playername] = nil
+		return
+	end
+	if fields.quit then
+		form[playername] = nil
 		return
 	end
 	if fields.euban_bany_back then
@@ -600,6 +630,11 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 		fields.euban_ban_reasonfield = form[playername].euban_ban_reasonfield
 		minetest.show_formspec(playername, "euban:ban", form_ban(playername, fields))
 		return
+	end
+	if fields.euban_bany_login == "true" then
+		form[playername].euban_bany_login = true
+	elseif fields.euban_bany_login == "false" then
+		form[playername].euban_bany_login = false
 	end
 	if fields.euban_bany_account and fields.euban_bany_account:sub(1, 3) == "DCL" and #form[playername].euban_bany_account ~= 0 then
 		table.insert(form[playername].euban_bany_disaccount, form[playername].euban_bany_account[tonumber(fields.euban_bany_account:sub(5))])
@@ -633,7 +668,7 @@ local function form_unban(playername, fields)
 				 "label[0,1.36;Search player]" ..
 				 "label[0.8,2.5;Reason]" ..
 				 "textarea[0.3,3.1;2.4,2;euban_unban_reasonfield;;".. minetest.formspec_escape(fields.euban_unban_reasonfield or "") .."]" ..
-				 "label[0,2.8;Write reason]" ..
+				 "label[0,2.8;Enter reason]" ..
 				 "button[0.6,4.8;1.2,1;euban_unban_unban;UNBAN]"
 end
 
@@ -642,20 +677,23 @@ function EUBan.unban(user, playername, reason)
 	if user and user ~= "" then
 		reasons.user = user
 	end
-	if reason and reason ~= "" then
-		reasons.message = reason
-	end
+	reasons.message = reason or ""
 	reasons.time = os.time()
 	table.insert(EUBan.Database[playername].reasons, reasons)
 	EUBan.Database[playername].time = nil
 	EUBan.Database[playername].banned = nil
+	minetest.chat_send_all("[Server]: ".. playername .." was unbanned by ".. user ..". Reason: ".. reason)
 end
 
 minetest.register_on_player_receive_fields(function(player, formname, fields)
   local playername = player:get_player_name()
-	if formname ~= "euban:unban" or not minetest.get_player_privs(playername).ban or fields.quit then
+	if formname ~= "euban:unban" or not minetest.get_player_privs(playername).ban then
     return
   end
+	if fields.quit then
+		form[playername] = nil
+		return
+	end
 	if fields.euban_unban_unban then
 		if fields.euban_unban_playerselect == "" then
 			minetest.chat_send_player(playername, "[Server]: Please select a player")
@@ -715,14 +753,14 @@ local function form_records(playername, fields)
 	local Banned, Account, Time = EUBan.status(EUBan.Database[Player])
 	local Ban = ""
 	if Banned and Account then
-		Ban = "Account, ".. (Time and convert_time(Time) or "Forever")
+		Ban = "Account, ".. (Time and convert_time(Time, true) or "Forever")
 	elseif Banned then
-		Ban = "IP, ".. (Time and convert_time(Time) or "Forever")
+		Ban = "IP, ".. (Time and convert_time(Time, true) or "Forever")
 	end
 	local Accounts = EUBan.accounts(Player)
 	local Reasons = ""
 	for index, main in ipairs(EUBan.Database[Player] and EUBan.Database[Player].reasons or {}) do
-		Reasons = Reasons .. ",User: ".. (main.user or "Server") .." | Time: ".. os.date("%d.%m.%y %H:%M", main.time) .." | Type: ".. (main.status and "Ban" or "Unban") .." | Reason:".. (main.message and ",".. seperate(main.message) or "")
+		Reasons = Reasons .. ",User: ".. (main.user or "(Server)") .." | Time: ".. os.date("%d.%m.%y %H:%M", main.time) .." | Type: ".. (main.status and "Ban" or "Unban") .." | Reason: ".. (main.message and ",".. seperate(main.message) or "(Automatic)")
 	end
 	Reasons = Reasons:sub(2)
 	return "size[8,4.8]" ..
@@ -742,9 +780,13 @@ end
 
 minetest.register_on_player_receive_fields(function(player, formname, fields)
   local playername = player:get_player_name()
-	if formname ~= "euban:records" or not minetest.get_player_privs(playername).ban or fields.quit then
+	if formname ~= "euban:records" or not minetest.get_player_privs(playername).ban then
     return
   end
+	if fields.quit then
+		form[playername] = nil
+		return
+	end
 	if fields.euban_records_search then
 		if fields.euban_records_searchfield == "" then
 			form[playername].euban_records_list = form_search("")
@@ -774,9 +816,13 @@ end
 
 minetest.register_on_player_receive_fields(function(player, formname, fields)
   local playername = player:get_player_name()
-	if formname ~= "euban:wl" or not minetest.get_player_privs(playername).privs or fields.quit then
+	if formname ~= "euban:wl" or not minetest.get_player_privs(playername).privs then
     return
   end
+	if fields.quit then
+		form[playername] = nil
+		return
+	end
 	if fields.euban_wl_list and fields.euban_wl_list:sub(1, 3) == "DCL" and #form[playername].euban_wl_list ~= 0 then
 		table.remove(form[playername].euban_wl_list, tonumber(fields.euban_wl_list:sub(5)))
 	end
@@ -835,15 +881,19 @@ local function form_limit(playername, fields)
 				 "field[0.3,1.6;2.5,1;euban_limit_count;;".. minetest.formspec_escape(fields.euban_limit_count and fields.euban_limit_count or (form[playername].euban_limit_player and (EUBan.Database[form[playername].euban_limit_player].limit or 0) or 0)) .."]" ..
 				 "field_close_on_enter[euban_limit_count;false]" ..
 				 "label[0,0;Search player]" ..
-				 "label[0,1;Account limit of ".. (form[playername].euban_limit_player or "") .."]" ..
+				 "label[0,1;Number of additional accounts from ".. (form[playername].euban_limit_player or "") .."]" ..
 				 "button[0.7,2.1;1.2,1;euban_limit_save;Save]"
 end
 
 minetest.register_on_player_receive_fields(function(player, formname, fields)
   local playername = player:get_player_name()
-	if formname ~= "euban:limit" or not minetest.get_player_privs(playername).privs or fields.quit then
+	if formname ~= "euban:limit" or not minetest.get_player_privs(playername).privs then
     return
   end
+	if fields.quit then
+		form[playername] = nil
+		return
+	end
 	if fields.euban_limit_search and fields.euban_limit_searchfield ~= "" then
 		if not EUBan.Database[fields.euban_limit_searchfield] then
 			minetest.chat_send_player(playername, "[Server]: Player ".. fields.euban_limit_searchfield .." doesnt exist yet")
@@ -868,9 +918,13 @@ end)
 
 minetest.register_on_player_receive_fields(function(player, formname, fields)
   local playername = player:get_player_name()
-	if (formname ~= "euban:ban" and formname ~= "euban:unban" and formname ~= "euban:records" and formname ~= "euban:wl" and formname ~= "euban:limit") or not fields.euban_tab or not minetest.get_player_privs(playername).ban or fields.quit then
+	if (formname ~= "euban:ban" and formname ~= "euban:unban" and formname ~= "euban:records" and formname ~= "euban:wl" and formname ~= "euban:limit") or not fields.euban_tab or not minetest.get_player_privs(playername).ban then
     return
   end
+	if fields.quit then
+		form[playername] = nil
+		return
+	end
 	if fields.euban_tab == "1" then
 		minetest.after(0.3, function()
 				minetest.show_formspec(playername, "euban:ban", form_ban(playername))
