@@ -1,6 +1,6 @@
 Minetest Mod 'euban'
 ==================
-Version 1.0
+Version 1.1
 
 License of source code:
 ---------------------------------
