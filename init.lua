@@ -85,7 +85,7 @@ local function save_file_step(Time, Path, Database)
 	minetest.after(Time, function()
 			if Path == EUBan.Path then
 				for name, main in pairs(Database) do
-					if main.time and main.time <= os.time() then
+					if main.time and main.time <= os.time() and EUBan.Database[name].started == nil then
 						table.insert(EUBan.Database[name].reasons, {time = main.time})
 						EUBan.Database[name].time = nil
 						EUBan.Database[name].banned = nil
@@ -586,14 +586,15 @@ function EUBan.ban(user, playername, account, time, reason, exceptions, login)
 			minetest.kick_player(name, banned)
 		end
 	end
-	--[[if time and time < save_file_step_next[EUBan.Path] and EUBan.Database[playername].started == nil then
-		minetest.after(time - os.time(), function()
+	time = type(time) == "number" and time - os.time() or time
+	if type(time) == "number" and time < save_file_step_next[EUBan.Path] and EUBan.Database[playername].started == nil then
+		minetest.after(time, function()
+				table.insert(EUBan.Database[playername].reasons, {time = EUBan.Database[playername].time})
 				EUBan.Database[playername].time = nil
 				EUBan.Database[playername].banned = nil
 		end)
-	end]]
-	time = convert_time(time - os.time())
-	minetest.chat_send_all("[Server]: ".. (account and "Account" or "IP") .." of ".. playername .." was banned ".. (time == "Forever" and time or "for ".. time) .. (login and " starting at the next login" or "") .." by ".. user ..". Reason: ".. reason)
+	end
+	minetest.chat_send_all("[Server]: ".. (account and "Account" or "IP") .." of ".. playername .." was banned ".. (type(time) ~= "number" and "forever" or "for ".. convert_time(time)) .. (login and type(time) == "number" and " starting at the next login" or "") .." by ".. user ..". Reason: ".. reason)
 end
 
 local function convert_time2(number, unit)
@@ -760,7 +761,7 @@ local function form_records(playername, fields)
 	local Accounts = EUBan.accounts(Player)
 	local Reasons = ""
 	for index, main in ipairs(EUBan.Database[Player] and EUBan.Database[Player].reasons or {}) do
-		Reasons = Reasons .. ",User: ".. (main.user or "(Server)") .." | Time: ".. os.date("%d.%m.%y %H:%M", main.time) .." | Type: ".. (main.status and "Ban" or "Unban") .." | Reason: ".. (main.message and ",".. seperate(main.message) or "(Automatic)")
+		Reasons = Reasons .. ",User: ".. (main.user or "(Server)") .." | Time: ".. os.date("%d.%m.%y %H:%M", main.time) .." | Type: ".. (main.status and "Ban" or "Unban") .." | Reason: ".. (main.message and (main.message == "" and "" or ",".. seperate(main.message)) or "(Automatic)")
 	end
 	Reasons = Reasons:sub(2)
 	return "size[8,4.8]" ..
@@ -881,7 +882,7 @@ local function form_limit(playername, fields)
 				 "field[0.3,1.6;2.5,1;euban_limit_count;;".. minetest.formspec_escape(fields.euban_limit_count and fields.euban_limit_count or (form[playername].euban_limit_player and (EUBan.Database[form[playername].euban_limit_player].limit or 0) or 0)) .."]" ..
 				 "field_close_on_enter[euban_limit_count;false]" ..
 				 "label[0,0;Search player]" ..
-				 "label[0,1;Number of additional accounts from ".. (form[playername].euban_limit_player or "") .."]" ..
+				 "label[0,1;Extra accounts for ".. (form[playername].euban_limit_player or "") .."]" ..
 				 "button[0.7,2.1;1.2,1;euban_limit_save;Save]"
 end
 
