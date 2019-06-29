@@ -1,1 +1,1 @@
-This mod is a GDPR (General Data Protection Regulation) conformal xban2
+Minetest mod adding complex ban system that's GDPR (General Data Protection Regulation) conform and can be used as a replacement for xban2
