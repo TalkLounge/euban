@@ -17,7 +17,7 @@ GitHub: [TalkLounge](https://github.com/TalkLounge/ "Link to TalkLounge's GitHub
 Minetest: [TalkLounge](https://forum.minetest.net/memberlist.php?mode=viewprofile&u=20862 "Link to TalkLounge's Minetest Forum account")
 
 **Other contributors**  
-See: [Other contributors](https://github.com/TalkLounge/exschem/graphs/contributors "Link to other contributors")
+See: [Other contributors](https://github.com/TalkLounge/euban/graphs/contributors "Link to other contributors")
 
 ## ToDo
 * Optimize whitelist formspec
