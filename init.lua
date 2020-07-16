@@ -253,17 +253,17 @@ function EUBan.is_banned(playername, playerip, login)
 		if banned and not account and not exception then
 			for _, ip in ipairs(main.ips) do
         if ip == playerip then
-					if login and EUBan.Database[playername].started == false then
-						EUBan.Database[playername].time = EUBan.Database[playername].time - EUBan.Database[playername].reasons[#EUBan.Database[playername].reasons].time + os.time()
-						EUBan.Database[playername].started = nil
+					if login and EUBan.Database[name].started == false then
+						EUBan.Database[name].time = EUBan.Database[name].time - EUBan.Database[name].reasons[#EUBan.Database[name].reasons].time + os.time()
+						EUBan.Database[name].started = nil
 					end
 					return "Banned by ip: ".. convert_time(time, true) .." Reason: ".. main.reasons[#main.reasons].message
 				end
 				for _, playerip in ipairs(EUBan.Database[playername] and EUBan.Database[playername].ips or {}) do
 					if ip == playerip then
-						if login and EUBan.Database[playername].started == false then
-							EUBan.Database[playername].time = EUBan.Database[playername].time - EUBan.Database[playername].reasons[#EUBan.Database[playername].reasons].time + os.time()
-							EUBan.Database[playername].started = nil
+						if login and EUBan.Database[name].started == false then
+							EUBan.Database[name].time = EUBan.Database[name].time - EUBan.Database[name].reasons[#EUBan.Database[name].reasons].time + os.time()
+							EUBan.Database[name].started = nil
 						end
 						return "Banned by ip: ".. convert_time(time, true) .." Reason: ".. main.reasons[#main.reasons].message
 					end
