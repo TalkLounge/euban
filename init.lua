@@ -312,7 +312,7 @@ function EUBan.is_limited(playername, playerip)
 			limit = limit + EUBan.Database[value].limit
 		end
 	end
-	if EUBan.Enable_Limit and not minetest.player_exists(playername) and #accounts >= limit then
+	if EUBan.Enable_Limit and not EUBan.player_exists(playername) and #accounts >= limit then
 		return "Your account limit has already been reached. Cant create another new account"
 	end
 end
