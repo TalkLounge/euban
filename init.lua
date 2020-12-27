@@ -11,7 +11,14 @@ EUBan.Limit = tonumber(minetest.setting_get("euban.limit")) or 1 --How much acco
 EUBan.cutIPv4 = tonumber(minetest.setting_get("euban.cutIPv4")) or 1 --How much octaves will be cropped beginning at the end
 EUBan.cutIPv6 = tonumber(minetest.setting_get("euban.cutIPv6")) or 4
 EUBan.Path = minetest.get_worldpath() .."/EUBan.db"
-local form_ban_reasons = {"Badname;Please choose a proper username", "Fake MT;You play an unofficial game! Official Game: Minetest\nPros of Minetest: No Ads & Free", "Insult;Please pay attention to your choice of words", "Vandalism;Vandalism isnt allowed here!", "Cheat;Hacks & Cheats arent allowed here! Please use an official Minetest releases"} --Predefined reasons for ban
+EUBan.Reasons = {
+	{"Remake", "Same reason as last time"},
+	{"Badname", "Please choose a proper username"},
+	{"Fake MT", "You play an unofficial game! Official Game: Minetest\nPros of Minetest: No Ads & Free"},
+	{"Insult", "Please pay attention to your choice of words"},
+	{"Vandalism", "Vandalism is not allowed here!"},
+	{"Cheat", "Hacks & Cheats arent allowed here! Please use an official Minetest releases"}
+} --Predefined reasons for ban
 
 local function read_file(Path)
 	local file = io.open(Path, "r")
@@ -346,9 +353,9 @@ end)
 
 local form = {}
 
-local function form_index(options, selected, cut)
+local function form_index(options, selected)
   for index, op in ipairs(options) do
-    if (not cut and selected == op) or (cut and op:sub(1, op:find(";") - 1) == selected) then
+    if selected == op then
       return index
     end
   end
@@ -395,6 +402,11 @@ local function form_search(playername)
 end
 
 local form_ban_times = {"Forever", "Year(s)", "Day(s)", "Hour(s)", "Minute(s)", "Second(s)"}
+local form_ban_reasons = {}
+
+for _, value in ipairs(EUBan.Reasons) do
+	table.insert(form_ban_reasons, value[1])
+end
 
 local function form_ban(playername, fields)
   fields = fields or {}
@@ -412,7 +424,7 @@ local function form_ban(playername, fields)
 				 "field_close_on_enter[euban_ban_timefield;false]" ..
 				 "dropdown[1,2.95;1.3,1;euban_ban_timeselect;".. table.concat(form_ban_times, ",") ..";" .. tostring(form[playername].euban_ban_timeselectindex) .."]" ..
 				 "label[0.8,3.8;Reason]" ..
-				 "dropdown[0,4.45;2.36,1;euban_ban_reasonselect;".. ((table.concat(form_ban_reasons, ",") ..","):gsub(";(.-)[,]", ","):sub(1, -2)) ..";".. tostring(form[playername].euban_ban_reasonselectindex) .."]" ..
+				 "dropdown[0,4.45;2.36,1;euban_ban_reasonselect;".. table.concat(form_ban_reasons, ",") ..";".. tostring(form[playername].euban_ban_reasonselectindex) .."]" ..
 				 "textarea[0.3,5.5;2.4,2;euban_ban_reasonfield;;".. minetest.formspec_escape(fields.euban_ban_reasonfield or "Same reason as last time") .."]" ..
 				 "label[0,4.1;Select predefined reason]" ..
 				 "label[0,5.2;Enter reason]" ..
@@ -537,9 +549,9 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 	if fields.euban_ban_timeselect then
 		form[playername].euban_ban_timeselectindex = form_index(form_ban_times, fields.euban_ban_timeselect)
 	end
-	if fields.euban_ban_reasonselect and (fields.euban_ban_reasonfield == "" or fields.euban_ban_reasonfield == "Same reason as last time") then
-		form[playername].euban_ban_reasonselectindex = form_index(form_ban_reasons, fields.euban_ban_reasonselect, true)
-		fields.euban_ban_reasonfield = form_ban_reasons[form[playername].euban_ban_reasonselectindex]:sub(fields.euban_ban_reasonselect:len() + 2)
+	if fields.euban_ban_reasonselect and form[playername].euban_ban_reasonselectindex ~= form_index(form_ban_reasons, fields.euban_ban_reasonselect) then
+		form[playername].euban_ban_reasonselectindex = form_index(form_ban_reasons, fields.euban_ban_reasonselect)
+		fields.euban_ban_reasonfield = EUBan.Reasons[form[playername].euban_ban_reasonselectindex][2]
 	end
 	fields.euban_ban_timefield = tonumber(fields.euban_ban_timefield) ~= nil and fields.euban_ban_timefield
 	minetest.show_formspec(playername, "euban:ban", form_ban(playername, fields))
