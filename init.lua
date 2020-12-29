@@ -425,7 +425,7 @@ local function form_ban(playername, fields)
 				 "dropdown[1,2.95;1.3,1;euban_ban_timeselect;".. table.concat(form_ban_times, ",") ..";" .. tostring(form[playername].euban_ban_timeselectindex) .."]" ..
 				 "label[0.8,3.8;Reason]" ..
 				 "dropdown[0,4.45;2.36,1;euban_ban_reasonselect;".. table.concat(form_ban_reasons, ",") ..";".. tostring(form[playername].euban_ban_reasonselectindex) .."]" ..
-				 "textarea[0.3,5.5;2.4,2;euban_ban_reasonfield;;".. minetest.formspec_escape(fields.euban_ban_reasonfield or "Same reason as last time") .."]" ..
+				 "textarea[0.3,5.5;2.4,2;euban_ban_reasonfield;;".. minetest.formspec_escape(fields.euban_ban_reasonfield or EUBan.Reasons[form[playername].euban_ban_reasonselectindex][2]) .."]" ..
 				 "label[0,4.1;Select predefined reason]" ..
 				 "label[0,5.2;Enter reason]" ..
 				 "button[0,7.2;1.3,1;euban_ban_banaccount;BAN:Account]" ..
