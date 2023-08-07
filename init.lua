@@ -28,6 +28,7 @@ local function read_file(Path)
 	local Database = minetest.deserialize(file:read("*a"))
 	file:close()
 	if not Database then
+		error("Read file failed")
 		return {}
 	end
 	return Database
@@ -75,14 +76,18 @@ end
 local function save_file(filepath, database)
 	local path, name, format = string.match(filepath, "(.-)([^\\/]-%.?([^%.\\/]*))$")
 	local tempfile = io.open(path .."~".. name, "w")
-  local success = tempfile:write("return {\n"..serialize(database, 1).."\n}")
-  tempfile:close()
-  if not success then
+	if tempfile then
+		local success = tempfile:write("return {\n"..serialize(database, 1).."\n}")
+		tempfile:close()
+		if not success then
+			error("Write to file failed")
+		else
+			os.remove(filepath)
+			os.rename(path .."~".. name, filepath)
+		end
+	else
 		error("Write to file failed")
-		return
-  end
-  os.remove(filepath)
-  os.rename(path .."~".. name, filepath)
+	end
 end
 
 local save_file_step_next = {}
@@ -303,7 +308,7 @@ end
 
 function EUBan.is_whitelisted(playername)
 	if EUBan.Whitelist and not minetest.get_player_privs(playername).privs and not (EUBan.Database[playername] and EUBan.Database[playername].whitelist) then
-		return "You arent on the whitelist"
+		return "You are not on the whitelist"
 	end
 end
 
@@ -320,7 +325,7 @@ function EUBan.is_limited(playername, playerip)
 		end
 	end
 	if EUBan.Enable_Limit and not EUBan.player_exists(playername) and #accounts >= limit then
-		return "Your account limit has already been reached. Cant create another new account"
+		return "Your account limit has already been reached. Can not create another new account"
 	end
 end
 
@@ -814,8 +819,16 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 end)
 
 local function form_wl(playername, fields)
+	local found = {}
+	for name, main in pairs(EUBan.Database) do
+		if EUBan.Database[name].whitelist and not minetest.get_player_privs(name).privs then
+			table.insert(found, name)
+    end
+  end
+	table.sort(found, function(a, b) return sort_table(a, b) end)
+	
 	fields = fields or {}
-	form[playername].euban_wl_list = form[playername].euban_wl_list or {}
+	form[playername].euban_wl_list = form[playername].euban_wl_list or found
 	form[playername].euban_wl_status = form[playername].euban_wl_status == nil and EUBan.Whitelist or form[playername].euban_wl_status
 	return "size[2.4,4.6]" ..
 				 "tabheader[0,0;euban_tab;Ban,Unban,Records,Whitelist,Limit;4;false;false]" ..
@@ -849,7 +862,7 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 				exist = true
 			end
 		end
-		if not exist then
+		if not exist and not minetest.get_player_privs(fields.euban_wl_addfield).privs then
 			table.insert(form[playername].euban_wl_list, fields.euban_wl_addfield)
 		end
 		fields.euban_wl_addfield = nil
@@ -862,9 +875,14 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 	if fields.euban_wl_save then
 		if form[playername].euban_wl_status then
 			EUBan.Whitelist = true
+			for name, main in pairs(EUBan.Database) do
+				EUBan.Database[name].whitelist = nil
+			end
 			for key, value in ipairs(form[playername].euban_wl_list) do
 				if not EUBan.Database[value] then
 					EUBan.Database[value] = {ips = {}, whitelist = true}
+				else
+					EUBan.Database[value].whitelist = true
 				end
 			end
 			for _, player in ipairs(minetest.get_connected_players()) do
